@@ -1,0 +1,33 @@
+# Text from .gitignore file from personal project
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Output for when I clicked on the .gitignore file from the class project (mb5370-mod-4)
+# Files to ignore
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.DS_Store
+
+# Extensions to ignore
+*.html
+*.png
+*.jpg
+*.jpeg
+*.eps
+*.pdf
+*.bmp
+*.svg
+*.tiff
+*.Rproj
+
+# Folders to ignore
+archive/
+scratch/
+test/
+
+# Keywords to ignore
+*archive
