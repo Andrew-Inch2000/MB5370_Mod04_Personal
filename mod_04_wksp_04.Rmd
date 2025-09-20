@@ -1,0 +1,430 @@
+---
+title: "Workshop 4 - Spatial data in R"
+author: "Andrew Inch"
+date: "2025-09-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#5.1	Workshop schedule
+This workshop will show you how to do GIS in R. This is obviously a much larger task than what we can do in this workshop, but the procedures we will do today are really designed to give you 
+a taste, and prove that we can do many spatial things in R. 
+
+#5.2 Workshop overview
+This workshop was developed by Associate Professor Chris Brown (University of Tasmania) and made available through his excellent website.
+
+By the end of the workshop, you will have learned how spatial data are stored in R (features and rasters, just like in ArcGIS or QGIS), how to handle some common map projections (remember your GIS!) and how to develop and export some simple maps. 
+
+With this brief understanding of GIS in R, you might want to join a map of Queensland regions with your QFISH data, and even advance your analysis all the way to showing some of your wrangling results in map format. With what you’ve learned in the workshops for this module, this is absolutely possible for you to achieve. You might need to do some troubleshooting and learning from outside of this workbook, so go back to the introduction section and review some of the help options there. 
+
+#5.3 R and how we can use it for spatial analyses
+As we have already learned in this workshop, R can be used for a range of purposes, including: 
+- creating publication quality data visualisations in the form of outstanding and high-impact plots using ggplot2
+- cleaning and wrangling data (so-called tidying) to help you get your data ready for downstream work such as statistics, visualisation and developing data summaries
+- performing complicated statistical analyses using the enormous number of R packages developed by the R developer community. 
+
+But did you know that R can also be used as a Geographic Information System (GIS)? If you want to - and some do - you can uninstall ArcGIS and QGIS and start to work solely in R for spatial analysis. 
+
+In general, R can do practically everything that the off-the-shelf GIS programs can do. It’s a little bit harder, but this offers a range of practical benefits:
+- When you write code, you can iteratively improve it until it does exactly what you want. You don’t need to remember complex workflows based on mouse clicks and maintaining processing logs. 
+- You can version control and backup your spatial analysis by hosting your script on github and using git for version control.
+- If you don’t want to version control your analysis, at least you can keep it as a script so that if you ever have to run your analysis again it should be straightforward.
+- In supporting reproducible and open science, you can provide your spatial analysis scripts for free to anyone who wants to see how you’ve done your work. This means you can prove your results are robust, be ethical in the way you work, and scarce funds for marine research and conservation don’t have for someone else to repeat something that you may have already successfully finished - they can learn from you! 
+- You can also interface your results directly with other components of the R system, such as obtaining results from your spatial analysis and then plotting them using ggplot2, or combining them with other datasets to gain deeper insights. This allows you to build ‘end-to-end’ analyses in a single script, taking your raw data, making some map figures, doing a spatial analysis, developing some high quality plots for data visualisation, and exporting your final figures. 
+- As above, you could even do it all in knitr and R markdown to develop a full report within a single R script. Did you know that the entire text book we are using, R4DS, was written as an R script? 
+- And of course, R is free! If you end up in a workplace with no funds to buy ArcGIS, you could make your maps in R for free. 
+
+In all of the workshops so far, we’ve learned that wrangling your data into a ‘tidy’ format allows you to more easily work with other packages such as ggplot2. This is also true when using R as a GIS. So, once again, we will be working in the tidyverse to make sure our data is tidy and ready for analysis.
+
+#5.4 Installing the spatial R packages
+In this section we are going to learn how R can be used to wrangle and analyse spatial data by working through a case study involving copepod data (see here for download). 
+
+We will be using an imported dataset, copepods_raw.csv, in this section, so be sure to organize your code appropriately to separate this workshop from previous sections. We will be using tidyverse so make sure it is loaded into your library for this session. We may also need to install and load packages sf, terra, leaflet and tmap and potentially also a base package in R called mgcv. Since we’re not sure about which ones we’ll ultimately use, and there’s very little cost to having many packages installed on your computer, just install them all in any case. 
+
+And don’t forget to **comment out the #install.packages** after you've installed the new packages. This stops you reinstalling your packages, and waiting for them, every time you run your script!
+
+If you are using your own computer there may be issues with installing some of these packages, depending on your operating system (potentially Mac users). Take the time to install now and check if there are any issues before we move forward. Instructors will try to help with any issues, but if they cannot, you may need to switch to a lab computer for this section.
+```{r}
+# install and load your packages
+#install.packages("sf") 
+#install.packages("terra")
+#install.packages("tmap")
+
+#load into R library
+library(tidyverse)
+library(sf) # simple features
+library (terra) # for raster
+library(tmap) # Thematic maps are geographical maps in which spatial data distributions are visualized
+```
+
+#5.5 Introduction to the problem
+Here we adapt A/Prof Brown’s statement of the problem. 
+
+You finally have a chance to meet one of your academic heroes. On meeting her, she mentions that she’s read your first PhD paper on zooplankton biogeography. She said she was particularly impressed with the extent of R analysis in your biogeography paper and goes on to suggest you collaborate on a new database she is ‘working with’.
+
+The database has extensive samples of copepod richness throughout Australia’s oceans and the Southern Ocean too. She has a hypothesis - that like many organisms, copepod species richness (which is the number of unique species) will be higher in warmer waters than cooler waters. But she needs help sorting out the data.
+
+First and foremost, she wants you to use your skills in R to help develop a map that could help you ‘get a look at’ whether this hypothesis is worth pursuing. 
+
+Your task now is - using R - to make a map of copepods in relation to temperature. 
+
+# 5.6 Downloading and loading the spatial dataset
+First of all, **download** the data here. Unzip it and put it in the data folder of your module 4 folder.
+
+This is a .zip file with a bunch of different files in it. A/Prof Brown explains:
+
+Your hero professor has sent you the data files in a .zip format. The spreadsheet copepods-raw.csv has measurements of copepod species richness from around Australia. Copepods are a type of zooplankton, perhaps the most abundant complex animals on the planet and an important part of ocean food-webs. 
+
+Like many distracted academics, she has also sent you some other data, but has not explained what it is all for yet. You’ll have to figure that out.
+
+Copepod species were counted using samples taken from a Continuous Plankton Recorder. The CPR was towed behind ‘ships of opportunity’ (including commercial and research vessels). ‘Silks’ run continuously through the CPR and the plankton are trapped onto the silks, kind of like a printer that runs all day and night to record plankton in the ocean.
+
+(The data you are using are in fact modified from real data, provided by Professor Ant Richardson at UQ. Ant runs a plankton lab that is collecting and processing this data from a program called AusCPR, find out more here.)
+
+So these data are what we’ll work with today. As a realistic learning experience, be ready to face some errors in the data received from our distracted professor!
+
+Let’s get started with that copepod richness data. In this part of the course we are going to clean it up and run some basic analyses.
+
+We will load in the data using a package from the tidyverse called readr. readr is handy because it does extra checks on data consistency over and above what the base R functions do. 
+
+#load the copepod data into R studio
+```{r}
+library(readr)
+dat <- read_csv("data-for-course/copepods_raw.csv")
+dat
+```
+Notice here the `silk_id` column, which is just the ID for each of the silks, onto which plankton are recorded. 
+
+For processing, silks are divided into segments, so you will also see a `segment_no` column. The other columns are pretty self explanatory.
+
+#5.7 Data exploration
+It is not at all uncommon to be given data by collaborators or other data providers that you may know very little about. You might have even found it on the internet, in a data archive, or as supplementary to a scientific paper. In every one of these cases, you need to make sure you understand the data and avoid errors, so it is always best to check it out with some visuals before moving to any analyses. 
+
+Since we don’t know this copepod data well and we haven’t been told much about it (and it lacks any metadata on what it all means), we need to thoroughly check it and make sure we understand it.
+
+You should have loaded all the relevant packages earlier in the section. For visualization we are using `ggplot2` for graphs (which you should be very familiar with) and `tmap` for maps, which we will learn more about as we go along.
+
+##5.7.1 Check coordinates
+The first step to making our first map using `ggplot2`is to plot the coordinates for the samples (segments of the CPR silks)
+```{r}
+library(ggplot2)
+ggplot(dat) + 
+  aes(x = longitude, y = latitude, colour = richness_raw) +
+  geom_point()
+```
+It should show the location of every segment and colour the points by species richness. Notice how here the x and y axes are latitude and longitude, just like a map? That’s right, because remember from workshops 1 and 2 that the `ggplot()` function simply sets up an x-y coordinate grid ready to plot any point you want, simply by giving it an x and y value for those two variables. In this case we have latitude and longitude, a simple map! 
+
+This looks good. But this is not a map. It doesn’t have those critical things a real map needs, such as a projection (to bend or warp your data over a spherical globe, the earth) so the real distances between these points when measured with a ruler are probably wrong. It’s simply a scatter plot, but is a nice and easy way to look at your spatial data. 
+
+So, now let’s look at the richness data (our main variable for analysis). This time we are going to visualize richness in a non-spatial way with latitude on the x-axis and richness on the y-axis. 
+
+You will soon note that it’s a fairly common part of the workflow to pop back and forth between spatial and non-spatial analyses. That’s one of the brilliant things about doing your spatial work alongside your analytical work in R.
+
+```{r}
+ggplot(dat, aes(x = latitude, y = richness_raw)) + 
+  stat_smooth() + 
+  geom_point()
+```
+When you’re developing your understanding of your dataset (in addition to obvious things such as looking at your raw data, like using `View()` to check out the raw data or printing the top 10 rows of your tibble) it’s also very handy to do lots of plots when getting to know your data, maps or not. Your brain is always the best tool for quickly spotting patterns in raw data.
+
+**So, now you will note that something obviously looks odd with this graph**, like there is an unnatural change in the data pattern at about latitude -40. What could cause this? Well who knows! Best here is to talk to your collaborator to try to work out what’s going on.
+
+Take some time to plot some other variables so you can get an understanding of what this dataset looks like.
+
+#5.8 Getting going with maps
+We will now repeat the above map of richness, but this time using some of R’s specialist packages for GIS and mapping. Now we introduce those important components of a GIS, the ability to reference data to real locations on the planet, and bend it around a mostly spherical ball that is the earth. 
+
+Lucky for us, R has some special packages developed specifically to do this.
+
+First, we will turn our point data into a spatially referenced data frame using the `sf` package (`sf` stands for ‘simple features’) which is an open standard for geospatial databases. For those that think in GIS, you can think of this format as a shapefile or feature collection.
+
+A great introduction to `sf` can be found in **Geocomputation in R**, which is free online. You should have already loaded the `sf` library into your session at the start of this section.
+
+Now, let’s turn our data into a ‘simple features collection’.
+```{r}
+sdat <- st_as_sf(dat, coords = c("longitude", "latitude"), 
+                 crs = 4326)
+```
+As is **good practice** (that I hope you’re learned by now!) use `?st_as_sf` to see what else it can convert and what all these arguments mean.
+- `st_as_sf` converts different data types to simple features. 
+- `dat` is our original data. 
+- `coords` gives the names of the columns that relate to the spatial coordinates (in order of X coordinate followed by Y coordinate).
+- `crs` stands for coordinate reference system which we will discuss next.
+
+#5.9 Coordinate reference systems
+You all have been introduced to some form of GIS before taking this module, so you should be familiar with coordinate reference systems. If you want to know more, feel free to go back to the Module 2 workbook (Introduction to GIS) and lectures from our LearnJCU site to read a bit more or revisit your learning on these. 
+
+In short, coordinate reference systems are required for 2D mapping to compensate for the lumpy, spherical (3D) nature of the earth. Read this link for a basic introduction if you can’t remember. 
+
+In mapping, we refer to the reference point as **datum** and the lumpy spherical earth model as an **ellipsoid**. Together, these make a **geographic coordinate reference system (GCS)**, which tells us where the coordinates of our copepod data are located on the earth.
+
+GCS’s are represented by angular units (i.e. longitude and latitude), usually in decimal degrees. Our copepod coordinates are long-lat, so we chose a common ‘one-size-fits-all’ GCS called WGS84 to define the crs using the **EPSG** code 4326. 
+
+What is an **EPSG code**? It’s a unique, short-hand code for a specific coordinate reference system (CRS).
+
+In R, best practice is to either use an **EPSG** code or **Well-known text (WKT)** to define a CRS. A **WKT** string contains all of the detailed information we need to define a crs, but is cumbersome if you don’t need all of the detail. Read this for a more complete overview.
+
+It’s easy to find out all of the above for a chosen crs in R. For example, for the EPSG code 4326 we can find out: 1) what the name of this crs is, 2) the corresponding proj4string, and 3) the WKT
+```{r}
+crs4326 <- st_crs(4326)
+crs4326 # look at the whole CRS
+crs4326$Name # pull out just the name of the crs
+[1] "WGS 84"
+```
+Now check out what the WKT looks like.
+```{r}
+crs4326$wkt # crs in well-known text format
+```
+When we make a 2-dimensional map in WGS84 GCS, we assume that a degree is a linear unit of measure (when in reality it’s angular).
+
+To more accurately map our data in 2 dimensions, we need to decide how to ‘project’ 3 dimensions into 2. 
+
+There are many ways to do the projection depending on where we are in the world and what we’re most interested in preserving (e.g., angles vs. distances vs. area). Projections are defined by a **projected coordinate reference system (PCS)**, and spatial packages in R use the software PROJ to do this.
+
+If you want to learn more about projections, try this blog.
+
+To find the most appropriate projected crs for your data, try the R package crs suggest.
+
+#5.10 Feature collection (points)
+Let’s now look at what we created with sdat. 
+```{r}
+sdat
+```
+**Output:**
+Simple feature collection with 5313 features and 9 fields
+Geometry type: POINT
+Dimension:     XY
+Bounding box:  xmin: 89.6107 ymin: -65.2428 xmax: 174.335 ymax: -16.80253
+Geodetic CRS:  WGS 84
+# A tibble: 5,313 × 10
+   silk_id segment_no sample_time_utc  project route vessel      meanlong region
+ *   <dbl>      <dbl> <chr>            <chr>   <chr> <chr>          <dbl> <chr> 
+ 1       1          1 26/06/2009 22:08 AusCPR  BRSY  ANL Windar...     153. East  
+ 2       1          5 26/06/2009 23:12 AusCPR  BRSY  ANL Windar...     153. East  
+ 3       1          9 27/06/2009 0:17  AusCPR  BRSY  ANL Windar...     153. East  
+ 4       1         13 27/06/2009 1:22  AusCPR  BRSY  ANL Windar...     153. East  
+ 5       1         17 27/06/2009 2:26  AusCPR  BRSY  ANL Windar...     153. East  
+ 6       1         18 27/06/2009 2:43  AusCPR  BRSY  ANL Windar...     153. East  
+ 7       1         26 27/06/2009 4:52  AusCPR  BRSY  ANL Windar...     153. East  
+ 8       1         30 27/06/2009 5:57  AusCPR  BRSY  ANL Windar...     153. East  
+ 9       1         33 27/06/2009 6:45  AusCPR  BRSY  ANL Windar...     153. East  
+10       1         37 27/06/2009 7:50  AusCPR  BRSY  ANL Windar...     153. East  
+# ... with 5,303 more rows, and 2 more variables: richness_raw <dbl>,
+#   geometry <POINT [°]>
+
+The data table in `sdat` looks much like `dat` did, but note it now has a geometry column. This is where the coordinates (just one point for each data row) are stored. More complex simple features could have a series of points, lines, polygons or other types of shapes nested in each row of the geometry column.
+
+The nice thing about `sf` is that because the data is basically a dataframe with a geometry, we can use all the operations that work on dataframes on `sf` simple features collections.
+
+These include data wrangling operations like `inner_join`, plotting operations from ggplot2 and model fitting tools too (like `glm`).
+
+`sf` also adds geometric operations, like `st_join` which do joins based on the coordinates. More on this later.
+
+So in summary, a simple feature is like a shapefile, in that it holds a lot of data in columns and rows but is spatially aware. Essentially, that includes extra columns regarding each row's position (in coordinates) and metadata about the coordinate reference system, the type of geometry (Point) and so on.
+
+#5.11 Cartography
+
+Now let’s get into the mapping. sf has simple plotting features, like this:
+```{r}
+plot(sdat["richness_raw"])
+```
+Here we have only plotted the richness column. If we used `plot(sdat)` it would create a panel for every variable in our dataframe. In sf, we can use square brackets `["richness_raw"]` to select a single variable.
+```{r}
+plot(sdat)
+```
+##5.12 Thematic maps for communication
+
+So far in this module we’ve used `ggplot2` for doing our plots and graph-based data vis, but there are many other ones out there that might offer some different functionalities. The same goes for mapping, there are many nice packages out there to help make pretty maps. 
+
+In this module we will use `tmap`. `tmap` works similarly to `ggplot2` in that we build and add on layers. Here we only have one layer from `sdat`. We declare the layer with `tm_shape()` (in this case `sdat`), then the plot type with the following command.
+```{r}
+#using tmap
+library(tmap)
+tm1 <- tm_shape(sdat) + 
+  tm_dots(col = "richness_raw")
+tm1
+```
+- `tm_dots` to plot dots of the coordinates. Other options are `tm_polygons`, `tm_symbols` and many others we’ll see later.
+- We’ve chosen `"richness_raw"` as the color scale
+
+Note: you can customize these plots in a number of ways.
+
+Try to customize it, how about working out how to use a different colour ramp?
+
+Use `tmap_save` to save the map to your working directory. Remember to change the output path if you need to save it to a different folder.
+```{r}
+tmap_save(tm1, filename = "Richness-map.png", 
+          width = 600, height = 600)
+```
+##5.13 Mapping spatial polygons as layers
+As mentioned earlier, `sf` package can handle many types of spatial data, including shapes like polygons. To practice with polygons we will load in a map of Australia and a map of Australia’s continental shelf using `tmap` to add these layers.
+
+##5.13.1 Loading shapefiles
+Unlike the data we just mapped, which was a .csv file with coordinate columns, the polygons in this copepod data are stored as shapefiles. 
+
+Note that .shp files are generally considered an undesirable file format because they are inefficient at storing data and to save one shapefile you actually create multiple files. This means bits of the file might be lost if you transfer the data somewhere else. Even in GIS software these days, we are moving well away from shapefiles to use other data formats.
+
+A better format than shapefile is the `Geopackage` which can save and compress multiple different data types all in a single file. Read more about different file formats here.
+
+We are working with shapefiles in this case study because it is still the most likely format you’ll encounter when someone sends you a spatial dataset, but I encourage you to save your personal data in the `.gpkg` format as you move forward.
+
+We can read shapefiles directly into R with the `st_read` command (which is like `read_csv`, but for spatial files):
+```{r}
+library(sf)
+aus <- st_read("data-for-course/spatial-data/Aussie/Aussie.shp")
+```
+
+```{r}
+shelf <- st_read("data-for-course/spatial-data/aus_shelf/aus_shelf.shp")
+```
+As always check out the data by typing the object names and reviewing the output in the console. Note here that the CRS is provided in the shapefile, it’s already spatially aware.
+```{r}
+aus
+```
+##5.13.2 Mapping your polygons
+Again, `tmap` makes it very straightforward to make a map of polygons: 
+```{r}
+library(tmap)
+tm_shape(shelf) + 
+  tm_polygons()
+```
+Remember we can make a thematic map by layering it up just as we do for plots in `ggplot2`. Here we have indicated the shape of our map (`shelf`) and we have added a command `bbox = sdat` to expand the extent of the map so it depicts all of our copepod data points. We then add the shape of Australia `(aus`) on top of the shelf, and finally our copepod data (`sdat`) in the form of points using `tm_dots()`.
+```{r}
+tm_shape(shelf, bbox = sdat) + 
+  tm_polygons() +
+  tm_shape(aus) + 
+  tm_polygons() + 
+  tm_shape(sdat) + 
+  tm_dots()
+```
+
+And here’s what we get:
+
+5.14 Exploring t_map
+Now is your turn to explore the tmap package and try customizing your map. Remember, errors may be frustrating but they are a great way to learn! Use ?tmap in R studio to see what the package has to offer.
+To learn about a quick way to change the style, type tmap_style("beaver") then run your map code again. This function is similar to ggplot themes, and will allow you to style your maps in a way you find effective for best communicating your findings. Even better, it allows you to add your own personal touch to your maps made in R. 
+Now open the tmap vignette. It can be accessed via coding or web search ‘r tmap’.
+vignette('tmap-getstarted')
+
+Take 15-30 minutes to cement your learning of making maps in R. First of all, read through the vignette above and do the exercises. 
+
+Next, go even further and deepen you learning by following this tutorial: 
+https://bookdown.org/nicohahn/making_maps_with_r5/docs/tmap.html 
+Here you can learn about how to start accessing nice colour schemes, such as viridis:
+
+Lastly, the making maps with R tutorial will show you how to do some of these things in ggplot2, and use other amazing R packages such as leaflet, which allows you to make your maps interactive. So if you have time left over in this tutorial, use it to become a master of map making in R. 
+5.15 Exporting your map
+
+Now that you’ve worked your way through this workshop, and explored some extra features of tmap via the Vignette and online tutorials, customise your map! 
+
+Once you are satisfied with your map theme, colors etc. You can save and export it. You can do so by using tmap_save() to save your map as either an .html file or an image file (.JPG, .PNG etc.) to your designated folder. See ?tmap_save() in R studio for a full explanation of the arguments used with this command.
+5.16 Workshop summary
+You’ve now been able to make some basic thematic maps in R. However, we haven’t really moved into the spatial analysis of the spatial data files you are now able to access and map with R. So, with the knowledge you gained today, you will now be able to push further into mapping in R, which can allow you to advance your work in many ways:
+Use terra to import raster data. See A/Prof Brown’s workshop page (which is a full day workshop) to see how you can add spatially comprehensive raster data of sea surface temperature to your map. 
+
+Intersect these raster data with your points, allowing you to “sample” (meaning to extract a pixel value) the sea surface temperature for each point in your dataset. This action, sampling a raster file with a site, is a very common action in any spatial analysis. For example, you could sample a tide height or turbidity dataset for your field sites, for the day you did your field work.
+5.17 Homework
+Revisit your pipeline analysis and follow the instructions on LearnJCU for submitting your Module e-portfolio for assessment. If you have time left over, why not consider how you could join a spatial dataset of Queensland's regions (which you should be able to find on QFISH or some other government website) with your fisheries data, and make a map showing areas with high or low catches and so on? 
+
+
+
+Appendix A: Tibbles
+As we’ve already said, tibbles are not the same as R’s built-in data frame (which we will carefully distinguish by calling them a  data.frame) but just think of them like that - the best, most current way of representing tabular data to R. 
+Take your time to read a little more: vignette("tibble"). 
+Remember vignettes come with every package and are a fountain of information, written in a way that is much easier to digest than the classic help documentation that comes with a package. 
+The tibble package is part of the core tidyverse package, which you should already have installed from the previous workshop. To use tibbles, we need to call in ‘tidyverse’ to our new script.
+library(tidyverse)
+
+Tibbles are a unifying feature of the tidyverse so you will want to know how to create them when working in the tidyverse. 
+To convert regular data frames into tibbles you can use as_tibble():
+iris # look at iris
+str(iris) # check it out - what type is it? How many rows?
+
+as_tibble(iris)
+#> # A tibble: 150 × 5
+#>   Sepal.Length Sepal.Width Petal.Length Petal.Width Species
+#>          <dbl>       <dbl>        <dbl>       <dbl> <fct>  
+#> 1          5.1         3.5          1.4         0.2 setosa 
+#> 2          5.9         3            1.4         0.2 setosa 
+#> 3          5.7         3.2          1.3         0.2 setosa 
+#> 4          5.6         3.1          1.5         0.2 setosa 
+#> 5          5           3.6          1.4         0.2 setosa 
+#> 6          5.4         3.9          1.7         0.4 setosa 
+#> # ... with 144 more rows
+
+
+Notice how there is a major difference in how tibbles are represented to you in the console? We’ll get into the differences and the benefits of tibbles in a minute.
+Now, note that you can also build a tibble from scratch - below we do that by passing the data directly to it (as opposed to importing it via csv). This is sometimes important if you want to type your dataset directly in R, rather than reading in data from excel, or if you want to build one from a collection of some variables you’ve produced. 
+An excellent feature of a tibble is that they allow you to refer to variables that you just created, as shown below. See how we can call x when we define the z variable, even though we’ve only given a value for x within the tibble function? This functionality can be super efficient and helpful when building new column values. 
+tibble(
+  x = 1:5, 
+  y = 1, 
+  z = x ^ 2 + y # call new variables to produce new column values!
+
+
+#> # A tibble: 5 × 3
+#>       x     y     z
+#>   <int> <dbl> <dbl>
+#> 1     1     1     2
+#> 2     2     1     5
+#> 3     3     1    10
+#> 4     4     1    17
+#> 5     5     1    26
+
+Remember when we did this with data.frame in the intro to programming workshop? Definitely not as easy as this! We combined three character vectors together into separate variables and then combined them using the data.frame function into a data frame. Note here if you try to make a new variable by referring to it (e.g. z = x ^ 2 + y) R will just not let you do it using data.frame.
+How would you build this dataframe using the old data.frame function? The answer is it would take a few steps. See if you can do it. How can you make this work?
+data.frame(c(
+     x = 1:5, 
+     y = 1, 
+     z = x ^ 2 + y
+))
+Error in data.frame(c(x = 1:5, y = 1, z = x^2 + y)) : 
+  object 'x' not found
+
+The other nice thing is that tibbles can have ‘non-syntactic’ names otherwise not valid in R, like names containing spaces	, or other special characters. Handy when you want to use more ‘modern’ variable naming when writing scripts, such as long and informative variable names as our style guides recommend.
+I still don’t recommend spaces though, it’s easier to use an underscore or a full stop. But if you want to, do note that if there are non-syntactic variables in your tibble, you’ll need to refer to them with backticks to help R understand what’s going on. 
+These are generally called escape characters to separate code from labels. See below:
+tb <- tibble(
+  `:)` = "smile", 
+  ` ` = "space",
+  `2000` = "number"
+)
+tb
+#> # A tibble: 1 × 3
+#>   `:)`  ` `   `2000`
+#>   <chr> <chr> <chr> 
+#> 1 smile space number
+
+You’ll need the backticks for these variables when using other packages as well (ggplot2, dplyr, tidyr etc.). So in some ways it adds some issues, but it’s nice to know that it’s possible if you need to, or perhaps your raw data that you import has some spaces or other characters in them. Tibbles can handle that.
+Tibbles are “special” data frames that make our life easier when working in the tidyverse. So here let’s look more deeply at the difference between a tibble and a data.frame.
+The first difference lies in printing. +
+Tibbles only print the first 10 rows and all columns that can fit on the screen making it easy to work with really large data. 
+as_tibble(iris)
+
+No doubt you previously used View() or the R studio buttons frequently to look at your data frame in R. But what happens if you run all of your script at once? Or you want to rerun your script many times (like a simulation), or perhaps use knitr to write a report. View() doesn’t handle that well, so it’s better to ‘look’ at your data in the console itself. Tibble makes this way easier.
+Tibbles also print the type of each column variable next to its name (i.e. if it's a character, string, numeric etc.). This makes it easier for you to understand your data format - a key skill of being an effective programmer and very helpful for debugging.
+Tibbles also help your console from getting overwhelmed by printing massive data frames. So way better than using View() or printing a whole dataframe, or even using a workaround method such as using a function on your data frame that prints only the first few rows: head(10).
+Let’s have a look - notice this tibble is telling us we have a  data-time column (dttm), a date column, an integer, a double and a character. All without having to call an extra function to look at it. Read this if you want to know more: 18 Dates and times 
+tibble(
+  a = lubridate::now() + runif(1e3) * 86400,
+  b = lubridate::today() + runif(1e3) * 30,
+  c = 1:1e3,
+  d = runif(1e3),
+  e = sample(letters, 1e3, replace = TRUE)
+)
+#> # A tibble: 1,000 × 5
+#>   a                   b              c     d e    
+#>   <dttm>              <date>     <int> <dbl> <chr>
+#> 1 2022-11-18 23:15:18 2022-11-25     1 0.368 n    
+#> 2 2022-11-19 17:20:28 2022-11-30     2 0.612 l    
+#> 3 2022-11-19 11:44:07 2022-12-10     3 0.415 p    
+#> 4 2022-11-19 01:05:24 2022-12-09     4 0.212 m    
+#> 5 2022-11-18 21:29:41 2022-12-06     5 0.733 i    
+#> 6 2022-11-19 08:30:38 2022-12-02     6 0.460 n    
+#> # ... with 994 more rows
+
+
+
